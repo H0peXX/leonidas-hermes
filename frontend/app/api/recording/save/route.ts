@@ -6,6 +6,7 @@ export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
     const audioFile = formData.get('audio') as File;
+    const bytesFile = formData.get('bytes') as File;
     const sessionId = formData.get('sessionId') as string;
 
     if (!audioFile || !sessionId) {
@@ -16,16 +17,32 @@ export async function POST(request: NextRequest) {
     
     // Get existing files count for naming
     const existingFiles = await readdir(sessionPath).catch(() => []);
-    const recordingCount = existingFiles.filter(f => f.startsWith('recording_')).length + 1;
+    const recordingFiles = existingFiles
+      .filter(f => f.startsWith('recording_') && f.endsWith('.wav'))
+      .map(f => {
+        const match = f.match(/recording_(\d+)\.wav/);
+        return match ? parseInt(match[1]) : 0;
+      })
+      .sort((a, b) => a - b);
+    
+    const recordingCount = recordingFiles.length > 0 ? Math.max(...recordingFiles) + 1 : 1;
     
     const fileName = `recording_${recordingCount.toString().padStart(3, '0')}.wav`;
+    const bytesFileName = `recording_${recordingCount.toString().padStart(3, '0')}.bin`;
     const filePath = join(sessionPath, fileName);
+    const bytesFilePath = join(sessionPath, bytesFileName);
 
-    // Save with .wav extension
+    // Save WAV file
     const arrayBuffer = await audioFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
-
     await writeFile(filePath, buffer);
+
+    // Save bytes file if provided
+    if (bytesFile) {
+      const bytesArrayBuffer = await bytesFile.arrayBuffer();
+      const bytesBuffer = Buffer.from(bytesArrayBuffer);
+      await writeFile(bytesFilePath, bytesBuffer);
+    }
 
     return NextResponse.json({ 
       success: true, 

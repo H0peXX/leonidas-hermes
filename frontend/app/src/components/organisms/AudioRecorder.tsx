@@ -61,8 +61,13 @@ export default function AudioRecorder() {
   const saveChunk = async (chunks: Blob[]) => {
     const audioBlob = new Blob(chunks, { type: 'audio/wav' });
     
+    // แปลงเป็น bytes
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    
     const formData = new FormData();
     formData.append('audio', audioBlob);
+    formData.append('bytes', new Blob([bytes], { type: 'application/octet-stream' }));
     formData.append('sessionId', sessionIdRef.current);
 
     await fetch('/api/recording/save', {
